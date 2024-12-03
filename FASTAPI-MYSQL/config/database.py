@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, MetaData, inspect
 from sqlalchemy.exc import OperationalError
 
-URL_DATABASE = "mysql+pymysql://root@localhost:3306/test"
+URL_DATABASE = "mysql+pymysql://root:rootpassword@db:3306/test"
 
 engine = create_engine(URL_DATABASE, echo=True)
 
