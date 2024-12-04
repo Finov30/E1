@@ -136,7 +136,7 @@ async def upload_csv(file: UploadFile = File(...)):
 @user.post("/scrape")
 async def extraire_donnees_tableau():
     options = uc.ChromeOptions()
-    options.headless = False
+    options.headless = True
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 

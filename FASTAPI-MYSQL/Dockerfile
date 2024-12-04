@@ -5,6 +5,8 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y \
     chromium \
     chromium-driver \
+    xvfb \  
+    dbus-x11 \  
     && rm -rf /var/lib/apt/lists/*
 
 # Définition des variables d'environnement
