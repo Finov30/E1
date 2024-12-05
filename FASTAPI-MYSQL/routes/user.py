@@ -12,6 +12,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import os
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()  # Chargement des variables d'environnement
 
@@ -96,6 +97,37 @@ async def update_data(id: int, user: User):
 async def delete_data(id: int):
     conn.execute(user_ids.delete().where(user_ids.c.user_id == id))
     conn.execute(users.delete().where(users.c.id == id))
+    
+    query = select(users, user_ids.c.external_id).select_from(
+        users.join(user_ids, users.c.id == user_ids.c.user_id)
+    )
+    result = conn.execute(query).fetchall()
+    return [row._asdict() for row in result]
+
+@user.post("/fetch-external-users")
+async def fetch_external_users():
+    response = requests.get("https://fakestoreapi.com/users")
+    if response.status_code != 200:
+        raise HTTPException(status_code=500, detail="Failed to fetch data from external API")
+    
+    external_users = response.json()
+    
+    for ext_user in external_users:
+        encrypted_email = encrypt_data(ext_user['email'])
+        encrypted_password = encrypt_data(ext_user['password'])
+        name = ext_user['name']['firstname']
+        
+        result = conn.execute(users.insert().values(
+            name=name,
+            email=encrypted_email,
+            password=encrypted_password
+        ))
+        user_id = result.inserted_primary_key[0]
+        
+        conn.execute(user_ids.insert().values(
+            user_id=user_id,
+            external_id=f"EXT-API-{ext_user['id']}"
+        ))
     
     query = select(users, user_ids.c.external_id).select_from(
         users.join(user_ids, users.c.id == user_ids.c.user_id)
