@@ -9,4 +9,3 @@ aiofiles
 python-dotenv
 pymysql
 requests
-faker

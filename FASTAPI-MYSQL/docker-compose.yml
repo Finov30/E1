@@ -9,7 +9,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: mysql+pymysql://root:rootpassword@db:3306/test  
+      DATABASE_URL: mysql+pymysql://root:rootpassword@db:3306/test  # Ajout du mot de passe ici
     depends_on:
       - db
     volumes:
@@ -23,7 +23,7 @@ services:
     container_name: mysql_db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword  
+      MYSQL_ROOT_PASSWORD: rootpassword  # Définir un mot de passe pour l'utilisateur root
       MYSQL_DATABASE: test
       MYSQL_ROOT_HOST: "%"
     ports:

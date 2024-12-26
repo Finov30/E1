@@ -1,9 +1,0 @@
-faker
-fastapi
-sqlalchemy
-cryptography
-python-multipart
-aiofiles
-python-dotenv
-pymysql
-requests 

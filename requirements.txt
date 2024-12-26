@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+cryptography
+undetected-chromedriver
+selenium
+python-multipart
+aiofiles
+python-dotenv
+pymysql
