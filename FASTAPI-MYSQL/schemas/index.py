@@ -1,1 +1,1 @@
-from schemas.user import User
+from schemas.userschemas import users, address_table

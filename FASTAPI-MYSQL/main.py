@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routes.index import user
+from routes.indexroutes import user
 from dotenv import load_dotenv
 from config.database import create_tables
 
