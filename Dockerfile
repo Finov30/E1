@@ -26,13 +26,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copie du reste du code
 COPY . .
 
-# Rendre le script de démarrage exécutable
-COPY start.sh .
-RUN chmod +x start.sh
+# Convertir les fins de ligne et rendre le script exécutable
+RUN dos2unix start.sh && \
+    chmod +x start.sh
 
 # Création d'un utilisateur non-root pour la sécurité
-RUN adduser --disabled-password --gecos '' appuser
-RUN chown -R appuser:appuser /app
+RUN adduser --disabled-password --gecos '' appuser && \
+    chown -R appuser:appuser /app && \
+    chmod 777 /app  # Permet à l'utilisateur d'écrire le fichier .env
+
 USER appuser
 
 # Exposition du port
