@@ -94,29 +94,40 @@ class Address(BaseModel):
 @user.get("/")
 async def read_data():
     try:
-        query = select(users, addresses).select_from(
-            users.join(addresses, users.c.id == addresses.c.user_id)
-        )
-        result = conn.execute(query).fetchall()
+        start_time = time.time()
         
-        formatted_data = []
-        for row in result:
-            data = {
-                "id": row.id,
-                "name": row.name,
-                "username": decrypt_data(row.username),
-                "address": {
-                    "id": row.addresses_id,
-                    "user_id": row.user_id,
-                    "street": row.street,
-                    "zipcode": row.zipcode,
-                    "country": row.country
+        # Utiliser la base de données principale (fastapi_db)
+        with engine.connect() as connection:
+            query = select(users, addresses).select_from(
+                users.join(addresses, users.c.id == addresses.c.user_id)
+            )
+            result = connection.execute(query).fetchall()
+            
+            formatted_data = []
+            for row in result:
+                data = {
+                    "id": row.id,
+                    "name": row.name,
+                    "username": decrypt_data(row.username),
+                    "address": {
+                        "id": row.addresses_id,
+                        "user_id": row.user_id,
+                        "street": row.street,
+                        "zipcode": row.zipcode,
+                        "country": row.country
+                    }
                 }
-            }
-            formatted_data.append(data)
-        
-        return formatted_data
+                formatted_data.append(data)
+            
+            # Ajouter les métriques
+            DB_OPERATIONS_PROCESSING_TIME.labels(operation_type="read_data").observe(
+                time.time() - start_time
+            )
+            USER_OPERATIONS_COUNTER.labels(operation_type="read_data").inc(len(formatted_data))
+            
+            return formatted_data
     except Exception as e:
+        FAILED_OPERATIONS_COUNTER.labels(operation_type="read_data").inc()
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de la lecture des données: {str(e)}"
@@ -187,18 +198,29 @@ async def create_user(user_data: UserCreate, address_data: AddressCreate):
 @user.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(user_id: int):
     try:
-        query = select(users).where(users.c.id == user_id)
-        result = conn.execute(query).first()
+        start_time = time.time()
         
-        if not result:
-            raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-        
-        return {
-            "id": result.id,
-            "name": result.name,
-            "username": decrypt_data(result.username)
-        }
+        with engine.connect() as connection:
+            query = select(users).where(users.c.id == user_id)
+            result = connection.execute(query).first()
+            
+            if not result:
+                raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+            
+            # Ajouter les métriques
+            DB_OPERATIONS_PROCESSING_TIME.labels(operation_type="get_user").observe(
+                time.time() - start_time
+            )
+            
+            return {
+                "id": result.id,
+                "name": result.name,
+                "username": decrypt_data(result.username)
+            }
+    except HTTPException:
+        raise
     except Exception as e:
+        FAILED_OPERATIONS_COUNTER.labels(operation_type="get_user").inc()
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de la lecture de l'utilisateur: {str(e)}"
@@ -207,26 +229,75 @@ async def get_user(user_id: int):
 @user.get("/addresses/{user_id}", response_model=Address)
 async def get_user_address(user_id: int):
     try:
-        query = select(addresses).where(addresses.c.user_id == user_id)
-        result = conn.execute(query).first()
+        start_time = time.time()
         
-        if not result:
-            raise HTTPException(
-                status_code=404,
-                detail="Adresse non trouvée pour cet utilisateur"
+        with engine.connect() as connection:
+            # Vérifier si l'adresse existe
+            query = select(addresses).where(addresses.c.user_id == user_id)
+            result = connection.execute(query).first()
+            
+            if not result:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Adresse non trouvée pour cet utilisateur"
+                )
+            
+            # Ajouter les métriques
+            DB_OPERATIONS_PROCESSING_TIME.labels(operation_type="get_address").observe(
+                time.time() - start_time
             )
-        
-        return {
-            "id": result.id,
-            "user_id": result.user_id,
-            "street": result.street,
-            "zipcode": result.zipcode,
-            "country": result.country
-        }
+            
+            return {
+                "id": result.id,
+                "user_id": result.user_id,
+                "street": result.street,
+                "zipcode": result.zipcode,
+                "country": result.country
+            }
+    except HTTPException:
+        raise
     except Exception as e:
+        FAILED_OPERATIONS_COUNTER.labels(operation_type="get_address").inc()
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de la lecture de l'adresse: {str(e)}"
+        )
+
+@user.delete("/addresses/{user_id}")
+async def delete_user_address(user_id: int):
+    try:
+        start_time = time.time()
+        
+        with engine.begin() as transaction:
+            # Vérifier si l'adresse existe
+            exists_query = select(addresses).where(addresses.c.user_id == user_id)
+            exists = transaction.execute(exists_query).first()
+            
+            if not exists:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Adresse non trouvée pour cet utilisateur"
+                )
+            
+            # Supprimer l'adresse
+            delete_query = addresses.delete().where(addresses.c.user_id == user_id)
+            transaction.execute(delete_query)
+            
+            # Ajouter les métriques
+            DB_OPERATIONS_PROCESSING_TIME.labels(operation_type="delete_address").observe(
+                time.time() - start_time
+            )
+            USER_OPERATIONS_COUNTER.labels(operation_type="delete_address").inc()
+            
+            return {"message": "Adresse supprimée avec succès"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        FAILED_OPERATIONS_COUNTER.labels(operation_type="delete_address").inc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la suppression de l'adresse: {str(e)}"
         )
 
 @user.post("/fetch-external-users")
@@ -296,19 +367,44 @@ async def fetch_external_users():
 
 @user.delete("/users/{user_id}")
 async def delete_user(user_id: int):
-    query = users.delete().where(users.c.id == user_id)
-    result = conn.execute(query)
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"message": "User deleted successfully"}
-
-@user.delete("/addresses/{user_id}")
-async def delete_user_id(user_id: int):
-    query = addresses.delete().where(addresses.c.user_id == user_id)
-    result = conn.execute(query)
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail="User ID not found")
-    return {"message": "User ID deleted successfully"}
+    try:
+        start_time = time.time()
+        
+        with engine.begin() as transaction:
+            # Vérifier si l'utilisateur existe
+            user_exists = transaction.execute(
+                select(users).where(users.c.id == user_id)
+            ).first()
+            
+            if not user_exists:
+                raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+            
+            # Supprimer d'abord l'adresse (à cause de la clé étrangère)
+            transaction.execute(
+                addresses.delete().where(addresses.c.user_id == user_id)
+            )
+            
+            # Supprimer l'utilisateur
+            result = transaction.execute(
+                users.delete().where(users.c.id == user_id)
+            )
+            
+            # Ajouter les métriques
+            DB_OPERATIONS_PROCESSING_TIME.labels(operation_type="delete_user").observe(
+                time.time() - start_time
+            )
+            USER_OPERATIONS_COUNTER.labels(operation_type="delete_user").inc()
+            
+            return {"message": "Utilisateur et adresse associée supprimés avec succès"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        FAILED_OPERATIONS_COUNTER.labels(operation_type="delete_user").inc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la suppression de l'utilisateur: {str(e)}"
+        )
 
 @user.post("/addresses/", response_model=Address)
 async def create_address(address_data: AddressCreate, user_id: int):

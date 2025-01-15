@@ -6,7 +6,7 @@ docker network prune -f
 
 # 3. Créer le réseau app-network
 docker network create app-network
-git tag
+
 
 # 4. Démarrer les services
 docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build

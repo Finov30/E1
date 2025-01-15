@@ -12,5 +12,21 @@ fi
 # Générer le CSV exemple
 python generate_sample_csv.py
 
-# Démarrer l'application
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload 
+# Démarrer l'application en arrière-plan
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
+
+# Exécuter les tests
+echo "🚀 Lancement des tests des routes..."
+python test_routes.py
+
+# Vérifier le résultat des tests
+if [ $? -eq 0 ]; then
+    echo "✅ Tests réussis - L'application continue de fonctionner"
+else
+    echo "❌ Tests échoués - Arrêt de l'application"
+    pkill -f uvicorn
+    exit 1
+fi
+
+# Attendre que le processus uvicorn se termine
+wait 
